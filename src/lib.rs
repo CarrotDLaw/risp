@@ -133,9 +133,7 @@ macro_rules! risp_logical_condition {
         for j in argv.split_at(c + 1).1.iter() {
           if let (RispExpr::Float(x), RispExpr::Float(y)) = (i, j) {
             if (x - y).abs() < 1e-9 {
-              {
-                return Ok(RispExpr::Boolean(false));
-              }
+              return Ok(RispExpr::Boolean(false));
             }
           }
         }
@@ -567,6 +565,11 @@ mod tests {
       Ok(RispExpr::Float(n)) if n == (-3_f64 % 2_f64)));
     assert!(matches!(interpret(many_numbers, &mut env),
       Err(RispError::ExpectedModuloRemainderTwoForms(s)) if s == "rem"));
+
+    assert!(matches!(
+      interpret("(rem)", &mut env),
+      Err(RispError::ExpectedNumber)
+    ));
   }
 
   #[test]
