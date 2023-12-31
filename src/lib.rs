@@ -911,6 +911,11 @@ mod tests {
       Ok(RispExpr::Symbol(s)) if s == "b")
         && matches!(env.var.get("b"), Some(RispExpr::Boolean(b)) if *b)
     );
+
+    assert!(matches!(
+      interpret("(setq)", &mut env),
+      Err(RispError::ExpectedSymbol(func)) if func == "setq"
+    ));
   }
 
   #[test]
