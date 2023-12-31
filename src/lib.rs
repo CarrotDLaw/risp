@@ -1,5 +1,5 @@
 use std::{
-  collections::{hash_map::Entry::Vacant, HashMap, HashSet},
+  collections::{hash_map::Entry::*, HashMap, HashSet},
   fmt::Display,
 };
 
@@ -22,15 +22,9 @@ impl Display for RispExpr {
       match self {
         RispExpr::Boolean(b) => b.to_string(),
         RispExpr::Float(n) => n.to_string(),
-        RispExpr::List(l) => l
-          .iter()
-          .map(|x| x.to_string())
-          .collect::<Vec<String>>()
-          .join(", "),
-        RispExpr::Symbol(s) => {
-          s.to_string()
-        }
-        RispExpr::Function(_) => "Function {}".to_string(),
+        RispExpr::List(l) => format!("{:?}", dbg!(l)),
+        RispExpr::Symbol(s) => s.to_string(),
+        RispExpr::Function(f) => format!("{:?}", dbg!(f)),
       }
     )
   }
@@ -73,7 +67,7 @@ macro_rules! risp_modulo_remainder {
   ($operator:ident) => {
     RispExpr::Function(|argv| {
       if argv.len() > 2 {
-        return Err(RispError::ExpectedModuloRemainderTwoForms(
+        return Err(RispError::ExpectedTwoForms(
           stringify!($operator)[..3].to_string(),
         ));
       }
@@ -129,17 +123,7 @@ macro_rules! risp_logical_condition {
         return Err(RispError::ExpectedNumber);
       }
 
-      for (c, i) in argv.iter().enumerate() {
-        for j in argv.split_at(c + 1).1.iter() {
-          if let (RispExpr::Float(x), RispExpr::Float(y)) = (i, j) {
-            if (x - y).abs() < 1e-9 {
-              return Ok(RispExpr::Boolean(false));
-            }
-          }
-        }
-      }
-
-      Ok(RispExpr::Boolean(true))
+      Ok(RispExpr::Boolean((1..argv.len()).any(|i| argv[i..].contains(&argv[i - 1]))))
     })
   };
 }
@@ -159,8 +143,8 @@ impl Default for RispEnv {
   fn default() -> Self {
     let reserved_keywords: HashSet<String> = HashSet::from_iter(
       [
-        "defvar", "if", "max", "min", "mod", "rem", "+", "-", "*", "/", "=", "!=", ">", "<", ">=",
-        "<=",
+        "defvar", "setq", "if", "max", "min", "mod", "rem", "+", "-", "*", "/", "=", "!=", ">",
+        "<", ">=", "<=",
       ]
       .map(|s| s.to_string()),
     );
@@ -197,6 +181,9 @@ pub enum RispError {
   #[error("Could not read token.")]
   CouldNotReadToken,
 
+  #[error("Expected `(`.")]
+  ExpectedLeftBracket,
+
   #[error("Unexpected `)`.")]
   UnexpectedRightBracket,
 
@@ -230,26 +217,35 @@ pub enum RispError {
   #[error("Invalid `if` form.")]
   InvalidIfForm,
 
-  #[error("Expected symbol in `defvar`.")]
-  ExpectedDefvarSymbol,
+  #[error("Expected symbol in `{0}`.")]
+  ExpectedSymbol(String),
 
-  #[error("Invalid symbol '{0}' in `defvar`.")]
-  InvalidDefvarSymbol(String),
+  #[error("Expected value in `{0}`.")]
+  ExpectedValue(String),
 
-  #[error("Invalid value '{0}' in `defvar`.")]
-  InvalidDefvarValue(String),
+  #[error("Invalid a symbol '{0}' in `{1}`.")]
+  InvalidSymbol(String, String),
 
-  #[error("Expected only two forms in `defvar`.")]
-  ExpectedDefvarTwoForms,
+  #[error("Invalid a value '{0}' in `{1}`.")]
+  InvalidValue(String, String),
 
   #[error("Variable '{0}' is already defined.")]
   VariableAlreadyDefined(String),
 
+  #[error("Variable '{0}' is not yet defined.")]
+  VariableNotYetDefined(String),
+
   #[error("Expected only two forms in `{0}`.")]
-  ExpectedModuloRemainderTwoForms(String),
+  ExpectedTwoForms(String),
 }
 
 pub fn interpret(exprs: &str, env: &mut RispEnv) -> Result<RispExpr, RispError> {
+  let exprs = exprs.trim();
+
+  if exprs.chars().next().ok_or(RispError::CouldNotReadToken)? != '(' {
+    return Err(RispError::ExpectedLeftBracket);
+  }
+
   evaluate(&parse(&tokenise(exprs))?.0, env)
 }
 
@@ -350,6 +346,7 @@ fn evaluate_built_in_form(
   match first_form {
     RispExpr::Symbol(symb) => match symb.as_str() {
       "defvar" => Some(evaluate_defvar(argv, env)),
+      "setq" => Some(evaluate_setq(argv, env)),
       "if" => Some(evaluate_if(argv, env)),
       _ => None,
     },
@@ -359,17 +356,22 @@ fn evaluate_built_in_form(
 
 fn evaluate_defvar(argv: &[RispExpr], env: &mut RispEnv) -> Result<RispExpr, RispError> {
   if argv.len() > 2 {
-    return Err(RispError::ExpectedDefvarTwoForms);
+    return Err(RispError::ExpectedTwoForms("defvar".to_string()));
   }
 
-  let first_form = argv.first().ok_or(RispError::ExpectedDefvarSymbol)?;
+  let first_form = argv
+    .first()
+    .ok_or(RispError::ExpectedSymbol("defvar".to_string()))?;
   let symbol = match first_form {
     RispExpr::Symbol(symb) => Ok(symb.to_string()),
-    expr => Err(RispError::InvalidDefvarSymbol(expr.to_string())),
+    expr => Err(RispError::InvalidSymbol(
+      expr.to_string(),
+      "defvar".to_string(),
+    )),
   }?;
 
   if env.reserved_keywords.contains(symbol.as_str()) {
-    return Err(RispError::InvalidDefvarSymbol(symbol));
+    return Err(RispError::InvalidSymbol(symbol, "defvar".to_string()));
   }
 
   let value = if argv.len() == 2 {
@@ -382,6 +384,37 @@ fn evaluate_defvar(argv: &[RispExpr], env: &mut RispEnv) -> Result<RispExpr, Ris
     e.insert(value);
   } else {
     return Err(RispError::VariableAlreadyDefined(symbol));
+  }
+
+  Ok(first_form.clone())
+}
+
+fn evaluate_setq(argv: &[RispExpr], env: &mut RispEnv) -> Result<RispExpr, RispError> {
+  if argv.len() > 2 {
+    return Err(RispError::ExpectedTwoForms("setq".to_string()));
+  }
+
+  let first_form = argv
+    .first()
+    .ok_or(RispError::ExpectedSymbol("setq".to_string()))?;
+  let symbol = match first_form {
+    RispExpr::Symbol(symb) => Ok(symb.to_string()),
+    expr => Err(RispError::InvalidSymbol(
+      expr.to_string(),
+      "setq".to_string(),
+    )),
+  }?;
+
+  let value = if argv.len() == 2 {
+    evaluate(&argv[1], env)?
+  } else {
+    return Err(RispError::ExpectedValue("setq".to_string()));
+  };
+
+  if let Occupied(mut e) = env.var.entry(symbol.clone()) {
+    e.insert(value);
+  } else {
+    return Err(RispError::VariableNotYetDefined(symbol));
   }
 
   Ok(first_form.clone())
@@ -542,7 +575,7 @@ mod tests {
     assert!(matches!(interpret(two_numbers_with_negative, &mut env),
       Ok(RispExpr::Float(n)) if n == (((-3_f64 % 2_f64) + 2_f64) % 2_f64)));
     assert!(matches!(interpret(many_numbers, &mut env),
-      Err(RispError::ExpectedModuloRemainderTwoForms(s)) if s == "mod"));
+      Err(RispError::ExpectedTwoForms(s)) if s == "mod"));
 
     assert!(matches!(
       interpret("(mod)", &mut env),
@@ -564,7 +597,7 @@ mod tests {
     assert!(matches!(interpret(two_numbers_with_negative, &mut env),
       Ok(RispExpr::Float(n)) if n == (-3_f64 % 2_f64)));
     assert!(matches!(interpret(many_numbers, &mut env),
-      Err(RispError::ExpectedModuloRemainderTwoForms(s)) if s == "rem"));
+      Err(RispError::ExpectedTwoForms(s)) if s == "rem"));
 
     assert!(matches!(
       interpret("(rem)", &mut env),
@@ -816,18 +849,19 @@ mod tests {
     let defvar_with_invalid_symb = "(defvar 0 0)";
     let defvar_with_reserved_keyword = "(defvar defvar 0)";
     let defvar_with_number = "(defvar b (* 0 0))";
-    let defvar_with_boolean = "(defvar c (= 0 0))";
-    let defvar_without_value = "(defvar d)";
+    let defvar_with_boolean_expression = "(defvar c (= 0 0))";
+    let defvar_with_boolean_value = "(defvar d true)";
+    let defvar_without_value = "(defvar e)";
 
     assert!(matches!(interpret(defvar_with_valid_symb, &mut env),
       Ok(RispExpr::Symbol(s)) if s == "a"));
     assert!(matches!(
       interpret(defvar_with_invalid_symb, &mut env),
-      Err(RispError::InvalidDefvarSymbol(symb)) if symb == "0"
+      Err(RispError::InvalidSymbol(symb, func)) if symb == "0" && func == "defvar"
     ));
     assert!(matches!(
       interpret(defvar_with_reserved_keyword, &mut env),
-      Err(RispError::InvalidDefvarSymbol(symb)) if symb == "defvar"
+      Err(RispError::InvalidSymbol(symb, func)) if symb == "defvar" && func == "defvar"
     ));
     assert!(
       matches!(interpret(defvar_with_number, &mut env),
@@ -835,22 +869,48 @@ mod tests {
         && matches!(env.var.get("b"), Some(RispExpr::Float(n)) if *n == (0_f64 * 0_f64))
     );
     assert!(
-      matches!(interpret(defvar_with_boolean, &mut env),
+      matches!(interpret(defvar_with_boolean_expression, &mut env),
       Ok(RispExpr::Symbol(s)) if s == "c")
         && matches!(env.var.get("c"), Some(RispExpr::Boolean(b)) if *b)
     );
     assert!(
-      matches!(interpret(defvar_without_value, &mut env),
+      matches!(interpret(defvar_with_boolean_value, &mut env),
       Ok(RispExpr::Symbol(s)) if s == "d")
-        && matches!(env.var.get("d"), Some(RispExpr::Float(n)) if *n == 0_f64)
+        && matches!(env.var.get("d"), Some(RispExpr::Boolean(b)) if *b)
+    );
+    assert!(
+      matches!(interpret(defvar_without_value, &mut env),
+      Ok(RispExpr::Symbol(s)) if s == "e")
+        && matches!(env.var.get("e"), Some(RispExpr::Float(n)) if *n == 0_f64)
     );
     assert!(matches!(interpret(defvar_without_value, &mut env),
-      Err(RispError::VariableAlreadyDefined(s)) if s == "d"));
+      Err(RispError::VariableAlreadyDefined(s)) if s == "e"));
 
     assert!(matches!(
       interpret("(defvar)", &mut env),
-      Err(RispError::ExpectedDefvarSymbol)
+      Err(RispError::ExpectedSymbol(func)) if func == "defvar"
     ));
+  }
+
+  #[test]
+  fn test_setq() {
+    let mut env = RispEnv::new_default_env();
+    env.var.insert("a".to_string(), RispExpr::Float(3_f64));
+    env.var.insert("b".to_string(), RispExpr::Boolean(false));
+
+    let setq_with_number = "(setq a 0)";
+    let setq_with_boolean = "(setq b true)";
+
+    assert!(
+      matches!(interpret(setq_with_number, &mut env),
+      Ok(RispExpr::Symbol(s)) if s == "a")
+        && matches!(env.var.get("a"), Some(RispExpr::Float(n)) if *n == 0_f64)
+    );
+    assert!(
+      matches!(interpret(setq_with_boolean, &mut env),
+      Ok(RispExpr::Symbol(s)) if s == "b")
+        && matches!(env.var.get("b"), Some(RispExpr::Boolean(b)) if *b)
+    );
   }
 
   #[test]

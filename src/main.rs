@@ -15,7 +15,7 @@ fn main() {
       .map_err(|_| eprintln!("{}", RispError::StdinError))
       .ok();
 
-    match interpret(input.trim(), &mut global_env) {
+    match interpret(&input, &mut global_env) {
       Ok(result) => println!("{result}"),
       Err(e) => eprintln!("error: {e}"),
     }
