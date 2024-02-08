@@ -223,10 +223,10 @@ pub enum RispError {
   #[error("Expected value in `{0}`.")]
   ExpectedValue(String),
 
-  #[error("Invalid a symbol '{0}' in `{1}`.")]
+  #[error("Invalid symbol '{0}' in `{1}`.")]
   InvalidSymbol(String, String),
 
-  #[error("Invalid a value '{0}' in `{1}`.")]
+  #[error("Invalid value '{0}' in `{1}`.")]
   InvalidValue(String, String),
 
   #[error("Variable '{0}' is already defined.")]
