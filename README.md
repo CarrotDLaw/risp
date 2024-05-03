@@ -22,4 +22,4 @@ A toy Lisp interpreter written in Rust with reference to [Risp (in (Rust) (Lisp)
 
 - [Risp (in (Rust) (Lisp))](https://stopa.io/post/222)
 
-- [Risp](https://github.com/stopachka/risp/)
+- [stopachka/Risp](https://github.com/stopachka/risp/)
