@@ -30,11 +30,11 @@ impl Display for RispExpr {
   }
 }
 
-impl TryFrom<RispExpr> for f64 {
+impl TryFrom<&RispExpr> for f64 {
   type Error = RispError;
 
-  fn try_from(value: RispExpr) -> Result<Self, Self::Error> {
-    match value {
+  fn try_from(value: &RispExpr) -> Result<Self, Self::Error> {
+    match *value {
       RispExpr::Float(n) => Ok(n),
       _ => Err(RispError::ExpectedNumber),
     }
@@ -46,8 +46,7 @@ macro_rules! risp_elementary_arithmetic {
     RispExpr::Function(|argv| {
       Ok(RispExpr::Float(
         parse_float_list(argv)?
-          .iter()
-          .copied()
+          .into_iter()
           .reduce(|acc, x| acc $operator x)
           .ok_or(RispError::ExpectedNumber)?,
       ))
@@ -74,7 +73,6 @@ macro_rules! risp_modulo_remainder {
 
       let argv = argv
         .iter()
-        .cloned()
         .map(TryInto::<f64>::try_into)
         .collect::<Vec<Result<f64, RispError>>>();
       let (a, b) = (
@@ -92,9 +90,8 @@ macro_rules! risp_extremum {
     RispExpr::Function(|argv| {
       Ok(RispExpr::Float(
         parse_float_list(argv)?
-          .iter()
+          .into_iter()
           .$operator(|a, b| a.total_cmp(b))
-          .copied()
           .ok_or(RispError::ExpectedNumber)?,
       ))
     })
