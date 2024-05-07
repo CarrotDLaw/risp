@@ -143,7 +143,7 @@ impl Default for RispEnv {
         "defvar", "setq", "if", "max", "min", "mod", "rem", "+", "-", "*", "/", "=", "!=", ">",
         "<", ">=", "<=",
       ]
-      .map(|s| s.to_string()),
+      .map(|s: &str| s.to_string()),
     );
 
     let mut var: HashMap<String, RispExpr> = HashMap::new();
@@ -237,7 +237,7 @@ pub enum RispError {
 }
 
 pub fn interpret(exprs: &str, env: &mut RispEnv) -> Result<RispExpr, RispError> {
-  let exprs = exprs.trim();
+  let exprs: &str = exprs.trim();
 
   if exprs.chars().next().ok_or(RispError::CouldNotReadToken)? != '(' {
     return Err(RispError::ExpectedLeftBracket);
@@ -251,12 +251,13 @@ fn tokenise(expr: &str) -> Vec<String> {
     .replace('(', " ( ")
     .replace(')', " ) ")
     .split_whitespace()
-    .map(|x| x.to_string())
+    .map(|x: &str| x.to_string())
     .collect()
 }
 
 fn parse(tokens: &[String]) -> Result<(RispExpr, &[String]), RispError> {
-  let (token, unparsed_tokens) = tokens.split_first().ok_or(RispError::CouldNotReadToken)?;
+  let (token, unparsed_tokens): (&String, &[String]) =
+    tokens.split_first().ok_or(RispError::CouldNotReadToken)?;
 
   match token.as_str() {
     "(" => parse_sequence(unparsed_tokens),
@@ -267,11 +268,11 @@ fn parse(tokens: &[String]) -> Result<(RispExpr, &[String]), RispError> {
 
 fn parse_sequence(tokens: &[String]) -> Result<(RispExpr, &[String]), RispError> {
   let mut parsed_exprs: Vec<RispExpr> = Vec::new();
-  let mut unparsed_tokens = tokens;
-  let mut parsed_token;
+  let mut unparsed_tokens: &[String] = tokens;
+  let mut parsed_token: RispExpr;
 
   loop {
-    let (current_token, remaining_tokens) = unparsed_tokens
+    let (current_token, remaining_tokens): (&String, &[String]) = unparsed_tokens
       .split_first()
       .ok_or(RispError::MissingRightBracket)?;
 
@@ -356,10 +357,10 @@ fn evaluate_defvar(argv: &[RispExpr], env: &mut RispEnv) -> Result<RispExpr, Ris
     return Err(RispError::ExpectedTwoForms("defvar".to_string()));
   }
 
-  let first_form = argv
+  let first_form: &RispExpr = argv
     .first()
     .ok_or(RispError::ExpectedSymbol("defvar".to_string()))?;
-  let symbol = match first_form {
+  let symbol: String = match first_form {
     RispExpr::Symbol(symb) => Ok(symb.to_string()),
     expr => Err(RispError::InvalidSymbol(
       expr.to_string(),
@@ -371,7 +372,7 @@ fn evaluate_defvar(argv: &[RispExpr], env: &mut RispEnv) -> Result<RispExpr, Ris
     return Err(RispError::InvalidSymbol(symbol, "defvar".to_string()));
   }
 
-  let value = if argv.len() == 2 {
+  let value: RispExpr = if argv.len() == 2 {
     evaluate(&argv[1], env)?
   } else {
     RispExpr::Float(0_f64)
@@ -394,7 +395,7 @@ fn evaluate_setq(argv: &[RispExpr], env: &mut RispEnv) -> Result<RispExpr, RispE
   let first_form = argv
     .first()
     .ok_or(RispError::ExpectedSymbol("setq".to_string()))?;
-  let symbol = match first_form {
+  let symbol: String = match first_form {
     RispExpr::Symbol(symb) => Ok(symb.to_string()),
     expr => Err(RispError::InvalidSymbol(
       expr.to_string(),
@@ -402,7 +403,7 @@ fn evaluate_setq(argv: &[RispExpr], env: &mut RispEnv) -> Result<RispExpr, RispE
     )),
   }?;
 
-  let value = if argv.len() == 2 {
+  let value: RispExpr = if argv.len() == 2 {
     evaluate(&argv[1], env)?
   } else {
     return Err(RispError::ExpectedValue("setq".to_string()));
@@ -435,7 +436,7 @@ mod tests {
 
   #[test]
   fn test_empty_input() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
     assert!(matches!(
       interpret("", &mut env),
@@ -449,10 +450,10 @@ mod tests {
 
   #[test]
   fn test_addition() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_numbers = "(+ 3 2)";
-    let many_numbers = "(+ 5.4 4.3 3.2 2.1 1.0)";
+    let two_numbers: &str = "(+ 3 2)";
+    let many_numbers: &str = "(+ 5.4 4.3 3.2 2.1 1.0)";
 
     assert!(matches!(
       interpret(two_numbers, &mut env),
@@ -471,10 +472,10 @@ mod tests {
 
   #[test]
   fn test_subtraction() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_numbers = "(- 3 2)";
-    let many_numbers = "(- 5.4 4.3 3.2 2.1 1.0)";
+    let two_numbers: &str = "(- 3 2)";
+    let many_numbers: &str = "(- 5.4 4.3 3.2 2.1 1.0)";
 
     assert!(matches!(
       interpret(two_numbers, &mut env),
@@ -493,10 +494,10 @@ mod tests {
 
   #[test]
   fn test_multiplication() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_numbers = "(* 3 2)";
-    let many_numbers = "(* 5.4 4.3 3.2 2.1 1.0)";
+    let two_numbers: &str = "(* 3 2)";
+    let many_numbers: &str = "(* 5.4 4.3 3.2 2.1 1.0)";
 
     assert!(matches!(
       interpret(two_numbers, &mut env),
@@ -515,10 +516,10 @@ mod tests {
 
   #[test]
   fn test_division() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_numbers = "(/ 3 2)";
-    let many_numbers = "(/ 5.4 4.3 3.2 2.1 1.0)";
+    let two_numbers: &str = "(/ 3 2)";
+    let many_numbers: &str = "(/ 5.4 4.3 3.2 2.1 1.0)";
 
     assert!(matches!(
       interpret(two_numbers, &mut env),
@@ -537,11 +538,12 @@ mod tests {
 
   #[test]
   fn test_elementary_arithmetic() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let add_and_subtract = "(- 5.4 4.3 3.2 2.1 1.0 (+ 3 2))";
-    let multiply_and_divide = "(/ 5.4 4.3 3.2 2.1 1.0 (* 3 2))";
-    let elementary_arithmetic = "(/ 5.4 4.3 3.2 2.1 1.0 (* 3 2) (- 5.4 4.3 3.2 2.1 1.0 (+ 3 2)))";
+    let add_and_subtract: &str = "(- 5.4 4.3 3.2 2.1 1.0 (+ 3 2))";
+    let multiply_and_divide: &str = "(/ 5.4 4.3 3.2 2.1 1.0 (* 3 2))";
+    let elementary_arithmetic: &str =
+      "(/ 5.4 4.3 3.2 2.1 1.0 (* 3 2) (- 5.4 4.3 3.2 2.1 1.0 (+ 3 2)))";
 
     assert!(matches!(
       interpret(add_and_subtract, &mut env),
@@ -560,11 +562,11 @@ mod tests {
 
   #[test]
   fn test_modulo() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_numbers = "(mod 3 2)";
-    let two_numbers_with_negative = "(mod -3 2)";
-    let many_numbers = "(mod 3 3 3)";
+    let two_numbers: &str = "(mod 3 2)";
+    let two_numbers_with_negative: &str = "(mod -3 2)";
+    let many_numbers: &str = "(mod 3 3 3)";
 
     assert!(
       matches!(interpret(two_numbers, &mut env), Ok(RispExpr::Float(n)) if n == (3_f64 % 2_f64))
@@ -582,11 +584,11 @@ mod tests {
 
   #[test]
   fn test_remainder() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_numbers = "(rem 3 2)";
-    let two_numbers_with_negative = "(rem -3 2)";
-    let many_numbers = "(rem 3 3 3)";
+    let two_numbers: &str = "(rem 3 2)";
+    let two_numbers_with_negative: &str = "(rem -3 2)";
+    let many_numbers: &str = "(rem 3 3 3)";
 
     assert!(
       matches!(interpret(two_numbers, &mut env), Ok(RispExpr::Float(n)) if n == (3_f64 % 2_f64))
@@ -604,10 +606,10 @@ mod tests {
 
   #[test]
   fn test_max() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_numbers = "(max 3.3 2.2)";
-    let many_numbers = "(max (* 3.3 3.3) (+ 2.2 2.2) (- 1.1 1.1))";
+    let two_numbers: &str = "(max 3.3 2.2)";
+    let many_numbers: &str = "(max (* 3.3 3.3) (+ 2.2 2.2) (- 1.1 1.1))";
 
     assert!(matches!(
       interpret(two_numbers, &mut env),
@@ -626,10 +628,10 @@ mod tests {
 
   #[test]
   fn test_min() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_numbers = "(min 3.3 2.2)";
-    let many_numbers = "(min (* 3.3 3.3) (+ 2.2 2.2) (- 1.1 1.1))";
+    let two_numbers: &str = "(min 3.3 2.2)";
+    let many_numbers: &str = "(min (* 3.3 3.3) (+ 2.2 2.2) (- 1.1 1.1))";
 
     assert!(matches!(
       interpret(two_numbers, &mut env),
@@ -648,12 +650,12 @@ mod tests {
 
   #[test]
   fn test_equal_condition() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_equal_numbers = "(= 3 3)";
-    let many_equal_numbers = "(= (+ 3 3) (+ 3 3) (+ 3 3))";
-    let two_not_equal_numbers = "(= 3.3 1.1)";
-    let many_not_equal_numbers = "(= (+ 3.3 3.3) (+ 3.3 3.3) (+ 1.1 1.1))";
+    let two_equal_numbers: &str = "(= 3 3)";
+    let many_equal_numbers: &str = "(= (+ 3 3) (+ 3 3) (+ 3 3))";
+    let two_not_equal_numbers: &str = "(= 3.3 1.1)";
+    let many_not_equal_numbers: &str = "(= (+ 3.3 3.3) (+ 3.3 3.3) (+ 1.1 1.1))";
 
     assert!(matches!(
       interpret(two_equal_numbers, &mut env),
@@ -680,12 +682,12 @@ mod tests {
 
   #[test]
   fn test_not_equal_condition() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_not_equal_numbers = "(!= 3.3 1.1)";
-    let many_not_equal_numbers = "(!= (+ 3.3 3.3) (+ 2.2 2.2) (+ 1.1 1.1))";
-    let two_equal_numbers = "(!= 3 3)";
-    let many_equal_numbers = "(!= (+ 3 3) (+ 3 3) (+ 3 3))";
+    let two_not_equal_numbers: &str = "(!= 3.3 1.1)";
+    let many_not_equal_numbers: &str = "(!= (+ 3.3 3.3) (+ 2.2 2.2) (+ 1.1 1.1))";
+    let two_equal_numbers: &str = "(!= 3 3)";
+    let many_equal_numbers: &str = "(!= (+ 3 3) (+ 3 3) (+ 3 3))";
 
     assert!(matches!(
       interpret(two_not_equal_numbers, &mut env),
@@ -712,12 +714,12 @@ mod tests {
 
   #[test]
   fn test_greater_condition() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_sorted_numbers = "(> 3 2)";
-    let many_sorted_numbers = "(> (+ 3 3) (+ 2 2) (+ 1 1))";
-    let two_unsorted_numbers = "(> 3 4)";
-    let many_unsorted_numbers = "(> (+ 3 3) (+ 3 3) (+ 4 4))";
+    let two_sorted_numbers: &str = "(> 3 2)";
+    let many_sorted_numbers: &str = "(> (+ 3 3) (+ 2 2) (+ 1 1))";
+    let two_unsorted_numbers: &str = "(> 3 4)";
+    let many_unsorted_numbers: &str = "(> (+ 3 3) (+ 3 3) (+ 4 4))";
 
     assert!(matches!(
       interpret(two_sorted_numbers, &mut env),
@@ -744,12 +746,12 @@ mod tests {
 
   #[test]
   fn test_smaller_condition() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_sorted_numbers = "(< 2 3)";
-    let many_sorted_numbers = "(< (+ 1 1) (+ 2 2) (+ 3 3))";
-    let two_unsorted_numbers = "(< 4 3)";
-    let many_unsorted_numbers = "(< (+ 4 4) (+ 3 3) (+ 3 3))";
+    let two_sorted_numbers: &str = "(< 2 3)";
+    let many_sorted_numbers: &str = "(< (+ 1 1) (+ 2 2) (+ 3 3))";
+    let two_unsorted_numbers: &str = "(< 4 3)";
+    let many_unsorted_numbers: &str = "(< (+ 4 4) (+ 3 3) (+ 3 3))";
 
     assert!(matches!(
       interpret(two_sorted_numbers, &mut env),
@@ -776,12 +778,12 @@ mod tests {
 
   #[test]
   fn test_greater_or_equal_condition() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_sorted_numbers = "(>= 3 3)";
-    let many_sorted_numbers = "(>= (+ 3 3) (+ 2 2) (+ 2 2))";
-    let two_unsorted_numbers = "(>= 3 4)";
-    let many_unsorted_numbers = "(>= (+ 3 3) (+ 3 3) (+ 4 4))";
+    let two_sorted_numbers: &str = "(>= 3 3)";
+    let many_sorted_numbers: &str = "(>= (+ 3 3) (+ 2 2) (+ 2 2))";
+    let two_unsorted_numbers: &str = "(>= 3 4)";
+    let many_unsorted_numbers: &str = "(>= (+ 3 3) (+ 3 3) (+ 4 4))";
 
     assert!(matches!(
       interpret(two_sorted_numbers, &mut env),
@@ -808,12 +810,12 @@ mod tests {
 
   #[test]
   fn test_smaller_or_equal_condition() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let two_sorted_numbers = "(<= 3 3)";
-    let many_sorted_numbers = "(<= (+ 2 2) (+ 2 2) (+ 3 3))";
-    let two_unsorted_numbers = "(<= 4 3)";
-    let many_unsorted_numbers = "(<= (+ 4 4) (+ 3 3) (+ 3 3))";
+    let two_sorted_numbers: &str = "(<= 3 3)";
+    let many_sorted_numbers: &str = "(<= (+ 2 2) (+ 2 2) (+ 3 3))";
+    let two_unsorted_numbers: &str = "(<= 4 3)";
+    let many_unsorted_numbers: &str = "(<= (+ 4 4) (+ 3 3) (+ 3 3))";
 
     assert!(matches!(
       interpret(two_sorted_numbers, &mut env),
@@ -840,15 +842,15 @@ mod tests {
 
   #[test]
   fn test_defvar() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let defvar_with_valid_symb = "(defvar a 0)";
-    let defvar_with_invalid_symb = "(defvar 0 0)";
-    let defvar_with_reserved_keyword = "(defvar defvar 0)";
-    let defvar_with_number = "(defvar b (* 0 0))";
-    let defvar_with_boolean_expression = "(defvar c (= 0 0))";
-    let defvar_with_boolean_value = "(defvar d true)";
-    let defvar_without_value = "(defvar e)";
+    let defvar_with_valid_symb: &str = "(defvar a 0)";
+    let defvar_with_invalid_symb: &str = "(defvar 0 0)";
+    let defvar_with_reserved_keyword: &str = "(defvar defvar 0)";
+    let defvar_with_number: &str = "(defvar b (* 0 0))";
+    let defvar_with_boolean_expression: &str = "(defvar c (= 0 0))";
+    let defvar_with_boolean_value: &str = "(defvar d true)";
+    let defvar_without_value: &str = "(defvar e)";
 
     assert!(matches!(interpret(defvar_with_valid_symb, &mut env),
       Ok(RispExpr::Symbol(s)) if s == "a"));
@@ -891,12 +893,12 @@ mod tests {
 
   #[test]
   fn test_setq() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
     env.var.insert("a".to_string(), RispExpr::Float(3_f64));
     env.var.insert("b".to_string(), RispExpr::Boolean(false));
 
-    let setq_with_number = "(setq a 0)";
-    let setq_with_boolean = "(setq b true)";
+    let setq_with_number: &str = "(setq a 0)";
+    let setq_with_boolean: &str = "(setq b true)";
 
     assert!(
       matches!(interpret(setq_with_number, &mut env),
@@ -917,10 +919,10 @@ mod tests {
 
   #[test]
   fn test_if() {
-    let mut env = RispEnv::new_default_env();
+    let mut env: RispEnv = RispEnv::new_default_env();
 
-    let true_condition = "(if (< 1 2) true false)";
-    let false_condition = "(if (> 1 2) true false)";
+    let true_condition: &str = "(if (< 1 2) true false)";
+    let false_condition: &str = "(if (> 1 2) true false)";
 
     assert!(matches!(interpret(true_condition, &mut env), Ok(RispExpr::Boolean(b)) if b));
     assert!(matches!(interpret(false_condition, &mut env), Ok(RispExpr::Boolean(b)) if !b));
